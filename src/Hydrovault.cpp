@@ -1,58 +1,49 @@
 #include <Arduino.h>
 #include <Wire.h>
-//#include <Adafruit_GFX.h>
-//#include <Adafruit_SSD1306.h>
 #define ENCODER_OPTIMIZE_INTERRUPTS
 #include <Encoder.h>
-#include <Stepper.h>
-#include <ds3231.h>
+#include <TMCStepper.h>
+#include <RTClib.h>
+#include <U8g2lib.h>
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_TSL2561_U.h>
+#include <Adafruit_AM2320.h>
 
-//screen settings
-//#define SCREEN_WIDTH 128 
-//#define SCREEN_HEIGHT 64
+//Arduino Nano pin definitions
+
+const int lightA = A0;
+const int lightB = A1;
+const int button = A3;
+const int potA = A6;
+const int potB = A7;
+const int encoderA = 2;
+const int encoderB = 3;
+const int buzzer = 4;
+const int vOutA = 5;
+const int vOutB = 6;
+const int stepPin = 7;
+const int dirPin = 8;
+
+//global variables
+//unsigned long startTime;
 
 //stepper & rotation settings
 const long stepsPerRevolution = 196600; //to get one full wheel cycle
 const int motorInterfaceType = 1;
 int rph = 1;
 
-//pin definitions
-const int waterSensor = A3;
-const int encoderA = 2;
-const int encoderB = 3;
-const int waterSensorPower = 4;
-const int lightA = 5;
-const int lightB = 6;
-const int stepperDisablePin = 7;
-const int stepPin = 8;
-const int dirPin = 9;
-const int button = 10;
-const int pump = 11;
-
-//global variables
-unsigned long startTime;
-
 //objects
 //Adafruit_SSD1306 screen(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 Encoder knob(encoderA, encoderB);
-Stepper motors = Stepper(3200, 8, 9);
+//Stepper motors = Stepper(3200, 8, 9);
 
 //RTC
-struct ts t;
+//struct ts t;
 
 void setup() {
   Serial.begin(115200);
   Wire.begin();
-
-  DS3231_init(DS3231_INTCN);
-  //t.hour=19; 
-  //t.min=21;
-  //t.sec=0;
-  //t.mday=27;
-  //t.mon=8;
-  //t.year=2020;
- 
-  //DS3231_set(t);
   
   pinMode(A3, INPUT);   //water sensor signal
   pinMode(2, INPUT);    //encoder interrupt A
@@ -66,9 +57,6 @@ void setup() {
   pinMode(10, INPUT);   //button
   pinMode(11, OUTPUT);  //pump
   pinMode(13, OUTPUT);  //LED builtin
-
-   
-//  screen.begin(SSD1306_SWITCHCAPVCC, 0x3C); //oLED screen init
   
   digitalWrite(pump, HIGH);  //set pump to off
   digitalWrite(lightA, HIGH);  //lights off
@@ -80,22 +68,10 @@ void setup() {
 
 void loop() {
   
-  digitalWrite(waterSensorPower, HIGH);
-  bool waterLevel = digitalRead(waterSensor); 
-
-  if (waterLevel == 1) digitalWrite(pump, LOW);
-  if (waterLevel == 0) digitalWrite(pump, HIGH);
-  
-  motors.setSpeed(4.11*rph); 
-  motors.step(-196600);
+  //motors.setSpeed(4.11*rph); 
+  //motors.step(-196600);
 
   digitalWrite(lightA, LOW);
   digitalWrite(lightB, LOW);
-
-  DS3231_get(&t);
-  if (t.hour <= 6) {
-    digitalWrite(lightA, HIGH);
-    digitalWrite(lightB, HIGH);
-  }
 
 }
