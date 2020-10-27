@@ -55,8 +55,11 @@ const int CSPin = 10;
 //Buzzer
   Buzzer buzzer(buzzerPin, LEDPin);
 
-//global variables
+//Adafruit AM2320 Temp & Humidity sensor
+  Adafruit_AM2320 am2320 = Adafruit_AM2320(); 
 
+//Adafruit TSL2561 Luminosity sensor
+  Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
 
 void setup() {
 
@@ -66,7 +69,18 @@ void setup() {
   SPI.begin();
   rtc.begin();         // initialize clock
   lcd.init();          // initialize the lcd 
-  lcd.backlight();     // turn on lcd backlight                  
+  lcd.backlight();     // turn on lcd backlight 
+  am2320.begin();      // temp+humidity sensor init  
+  tsl.begin();         // luminosity sensor init
+
+//TSL config
+  // tsl.setGain(TSL2561_GAIN_1X);      /* No gain ... use in bright light to avoid sensor saturation */
+  // tsl.setGain(TSL2561_GAIN_16X);     /* 16x gain ... use in low light to boost sensitivity */
+  tsl.enableAutoRange(true);            /* Auto-gain ... switches automatically between 1x and 16x */
+   
+  tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);      /* fast but low resolution */
+  // tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
+  // tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  /* 16-bit data but slowest conversions */     
   
 //pin modes
   pinMode(A0, OUTPUT); // light relay A
@@ -93,7 +107,7 @@ if (! rtc.isrunning()) {
     // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
 
-//TMC Stepper init
+//TMC Stepper setup
   digitalWrite(CS_PIN, HIGH);
   driver.begin();             // Initiate pins and registeries
   driver.rms_current(600);    // Set stepper current to 600mA. The command is the same as command TMC2130.setCurrent(600, 0.11, 0.5);
@@ -108,7 +122,7 @@ if (! rtc.isrunning()) {
 }
 
 void loop() {
-  
+
   digitalWrite(relayA, LOW);
   digitalWrite(relayB, LOW);
 
