@@ -1,0 +1,25 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "PlatformIO",
+			"task": "Upload",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"label": "PlatformIO: Upload"
+		},
+		{
+			"type": "PlatformIO",
+			"task": "Verbose Upload",
+			"problemMatcher": [
+				"$platformio"
+			],
+			"label": "PlatformIO: Verbose Upload",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		}
+	]
+}

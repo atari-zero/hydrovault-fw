@@ -15,20 +15,31 @@
 
 //Arduino Nano pin definitions
 
-const int relayA = A0;
-const int relayB = A1;
-const int button = A3;
-const int potA = A6;
-const int potB = A7;
+const int relayApin = A0;
+const int relayBpin = A1;
+const int buttonPin = A3;
+const int potApin = A6;
+const int potBpin = A7;
 const int encoderA = 2;
 const int encoderB = 3;
 const int buzzerPin = 4;
-const int vOutA = 5;
-const int vOutB = 6;
+const int vOutApin = 5;
+const int vOutBpin = 6;
 const int stepPin = 7;
 const int dirPin = 8;
 const int LEDPin = 9;
 const int CSPin = 10;
+
+//Global variables
+
+int rpd;
+int prg;
+int day;
+int tmp;
+int hum;
+int lux;
+bool relayAStat;
+bool relayBStat;
 
 //Encoder
   Encoder Enc (encoderA, encoderB);
@@ -77,9 +88,9 @@ void setup() {
   // tsl.setGain(TSL2561_GAIN_1X);      /* No gain ... use in bright light to avoid sensor saturation */
   // tsl.setGain(TSL2561_GAIN_16X);     /* 16x gain ... use in low light to boost sensitivity */
   tsl.enableAutoRange(true);            /* Auto-gain ... switches automatically between 1x and 16x */
-   
-  tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);      /* fast but low resolution */
-  // tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
+
+  //tsl.setIntegrpiationTime(TSL2561_INTEGRATIONTIME_13MS);      /* fast but low resolution */
+  tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
   // tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  /* 16-bit data but slowest conversions */     
   
 //pin modes
@@ -119,11 +130,63 @@ if (! rtc.isrunning()) {
   stepper.setAcceleration(1000*steps_per_mm); // 2000mm/s^2
   stepper.setPinsInverted(false, false, true);
   stepper.enableOutputs();
+
+//Welcome screen
+  lcd.clear();
+  lcd.setCursor(2,0);
+  lcd.print("HYDROVAULT  v1.0");
+  lcd.setCursor(2,1);
+  lcd.print("----------------");
+  lcd.setCursor(1,2);
+  lcd.print("Open Source Rotary");
+  lcd.setCursor(1,3);
+  lcd.print("Hydroponic  System");
+  delay(2000);
+  lcd.clear();
+
 }
 
 void loop() {
 
-  digitalWrite(relayA, LOW);
-  digitalWrite(relayB, LOW);
+  digitalWrite(relayApin, relayAStat); //Set lights to off
+  digitalWrite(relayBpin, relayBStat);
+
+  //Info Screen
+  //Display Time & Date
+  DateTime now = rtc.now();
+
+  char buf1[] = "hh:mm:ss";
+  char buf2[] = "DD/MM/YY";
+  lcd.setCursor(0,2);
+  lcd.print(now.toString(buf1));
+  lcd.setCursor(0,3);
+  lcd.print(now.toString(buf2));
+  
+  //Revolutions, day & program name
+  lcd.setCursor(0,0);
+  lcd.print("PRG:");
+  lcd.print("None");
+  lcd.setCursor(0,1);
+  lcd.print("Day:");
+  lcd.print(day);
+  
+  lcd.setCursor(12,0);
+  lcd.print("RPD:");
+  lcd.print(rpd);
+
+  //Temperature, Humidity & Luminosity readings
+  lcd.setCursor(12,1);
+  lcd.print("Tmp:"); 
+  lcd.print(tmp);
+  lcd.print((char)223);
+
+  lcd.setCursor(12,2);
+  lcd.print("Hum:"); 
+  lcd.print(hum);
+  lcd.print("%");
+
+  lcd.setCursor(12,3);
+  lcd.print("Lux:"); 
+  lcd.print(lux);
 
 }
