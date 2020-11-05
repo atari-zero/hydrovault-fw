@@ -133,6 +133,16 @@ void readSensors(){
   lux = event.light;
 }
 
+void displayTimeDate(){
+  DateTime now = rtc.now();
+  char buf1[] = "hh:mm:ss";
+  char buf2[] = "DD/MM/YY";
+  lcd.setCursor(0,2);
+  lcd.print(now.toString(buf1));
+  lcd.setCursor(0,3);
+  lcd.print(now.toString(buf2));
+}
+
 void setup() {
 
   SPI.begin();
@@ -168,20 +178,12 @@ void setup() {
 void loop() {
 
   readSensors();
+  displayTimeDate();
 
   digitalWrite(relayApin, relayAStat); //Set lights to off
   digitalWrite(relayBpin, relayBStat);
 
-  //Info Screen
-  //Display Time & Date
-  DateTime now = rtc.now();
-
-  char buf1[] = "hh:mm:ss";
-  char buf2[] = "DD/MM/YY";
-  lcd.setCursor(0,2);
-  lcd.print(now.toString(buf1));
-  lcd.setCursor(0,3);
-  lcd.print(now.toString(buf2));
+  //Info Screen 
   
   //Revolutions, day & program name
   lcd.setCursor(0,0);
