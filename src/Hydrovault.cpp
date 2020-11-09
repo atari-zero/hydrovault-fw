@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <Encoder.h>
+#include <SimpleRotary.h>
 #include <TMC2130Stepper.h>
 #include <AccelStepper.h>
 #include <RTClib.h>
@@ -32,36 +32,59 @@ const int CSPin = 10;
 
 //Global variables
 
-int rpd;
-int prg;
-int day;
-int tmp;
-int hum;
-int lux;
-bool relayAStat;
-bool relayBStat;
+enum state {
+  INFO_SCREEN,
+  MENU1,
+  MENU2,
+  MENU3, 
+  M_TIME,
+  M_DATE,
+  M_ALARM,
+  M_PROGRAM,
+  M_SPEED,
+  M_LIGHT_A,
+  M_LIGHT_B,
+  M_AUX_1,
+  M_AUX_2,
+  M_EEPROM,
+};
 
-//Encoder
-  Encoder Enc (encoderA, encoderB);
+enum selectorPosition {
+  SET_PROGRAM,
+  SET_SPEED,
+  SET_LIGHT_A,
+  SET_LIGHT_B,
+  SET_AUX_A,
+  SET_AUX_B,
+  SET_TIME,
+  SET_DATE,
+  SET_ALARM,
+  SET_EEPROM,
+  BACK
+};
 
-//LCD 2004 I2C
-  LiquidCrystal_I2C lcd(0x27,20,4);  // LCD address 0x27; 20 chars; 4 line display
+int state = INFO_SCREEN;  //Screen state
+int rpd;                  //Revolutions per day
+int prg;                  //Program No
+int day;                  //Days passed since beginning
+int tmp;                  //Current temperature
+int hum;                  //Current humidity  
+int lux;                  //Current luminosity
+int speed;                //Rotation speed
+bool relayAStat;          //Light A 
+bool relayBStat;          //Light B
+unsigned long timing;     //timing for delays
+int selectorPosition = 0;
+byte dir;
 
-//TMC2130 Stepper
-  TMC2130Stepper driver = TMC2130Stepper(LEDPin, dirPin, stepPin, CSPin);
-  AccelStepper stepper = AccelStepper(stepper.DRIVER, stepPin, dirPin);
-
-//RTC DS3107+
-  RTC_DS1307 rtc;
-
-//Buzzer
-  Buzzer buzzer(buzzerPin);
-
-//Adafruit AM2320 Temp & Humidity sensor
-  Adafruit_AM2320 am2320 = Adafruit_AM2320(); 
-
-//Adafruit TSL2561 Luminosity sensor
-  Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345);
+SimpleRotary rotary (encoderA, encoderB, buttonPin);   //Encoder
+LiquidCrystal_I2C lcd(0x27,20,4);   // LCD 2004 I2C LCD address 0x27; 20 chars; 4 line display
+TMC2130Stepper driver = TMC2130Stepper(LEDPin, dirPin, stepPin, CSPin);  //TMC2130 Stepper
+AccelStepper stepper = AccelStepper(stepper.DRIVER, stepPin, dirPin); //Accel Stepper Library
+RTC_DS1307 rtc; //Real Time Clock DS3107+
+Buzzer buzzer(buzzerPin); //Buzzer
+Adafruit_AM2320 am2320 = Adafruit_AM2320(); //Adafruit AM2320 Temp & Humidity sensor
+Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345); //Adafruit TSL2561 Luminosity sensor
 
 void setupTSL() {
   tsl.setGain(TSL2561_GAIN_1X);      /* No gain ... use in bright light to avoid sensor saturation */
@@ -143,6 +166,95 @@ void displayTimeDate(){
   lcd.print(now.toString(buf2));
 }
 
+void drawStaticInfoScreen(){
+  lcd.setCursor(0,0);
+  lcd.print("PRG:");  //Program - 4,0 for value
+  lcd.setCursor(0,1);
+  lcd.print("Day:");  //Day No - 4,1 for value
+  lcd.setCursor(10,0);
+  lcd.print("RPD:");  //Revs per day - 14,0 for value
+  lcd.setCursor(10,1);
+  lcd.print("Tmp:");  //Temperature - 14,1 for value
+  lcd.setCursor(10,2);
+  lcd.print("Hum:");  //Humidity - 14,2 for value
+  lcd.setCursor(10,3);
+  lcd.print("Lux:");  //Luminosity - 14,3 for value
+}
+
+void updateInfoScreen(){
+  lcd.setCursor(4,0);
+  lcd.print(prg);
+  lcd.setCursor(4,1);
+  lcd.print(day);
+  lcd.setCursor(14,0);
+  lcd.print(rpd);
+  lcd.setCursor(14,1);
+  lcd.print(tmp); lcd.print((char)223);
+  lcd.setCursor(14,2);
+  lcd.print(hum); lcd.print("%");
+  lcd.setCursor(14,3);
+  lcd.print(lux); lcd.print("     ");
+}
+
+void clearSelector(){
+  lcd.setCursor(0,0);
+  lcd.print("  ");
+  lcd.setCursor(0,1);
+  lcd.print("  ");
+  lcd.setCursor(0,2);
+  lcd.print("  ");
+  lcd.setCursor(0,3);
+  lcd.print("  ");
+}
+
+void drawStaticMenu(){
+  if (state == MENU1){
+    lcd.setCursor(2,0);
+    lcd.print("Set Program");
+    lcd.setCursor(2,1);
+    lcd.print("Set Speed");
+    lcd.setCursor(2,2);
+    lcd.print("Set Light A");
+    lcd.setCursor(2,3);
+    lcd.print("Set Light B");
+  }
+  if (state == MENU2){
+    lcd.setCursor(2,0);
+    lcd.print("Set Aux A");
+    lcd.setCursor(2,1);
+    lcd.print("Set Aux B");
+    lcd.setCursor(2,2);
+    lcd.print("Set Time");
+    lcd.setCursor(2,3);
+    lcd.print("Set Date");
+  }
+  if (state == MENU3){
+    lcd.setCursor(2,0);
+    lcd.print("Set Alarm");
+    lcd.setCursor(2,1);
+    lcd.print("Set EEPROM");
+    lcd.setCursor(2,2);
+    lcd.print("Back");
+  }
+}
+
+void Selector(){
+  if (dir == 1){
+    selectorPosition += 1;
+  }
+  if (dir == 2){
+    selectorPosition -= 1;
+  }
+  if (selectorPosition < 0) {
+    selectorPosition = 0;
+  }
+  if (selectorPosition > 10) {
+    selectorPosition = 10;
+  }
+
+
+}
+
 void setup() {
 
   SPI.begin();
@@ -153,6 +265,10 @@ void setup() {
   lcd.backlight();     // turn on lcd backlight 
   am2320.begin();      // temp+humidity sensor init  
   tsl.begin();         // luminosity sensor init
+
+  rotary.setTrigger(HIGH);
+  rotary.setDebounceDelay(8);
+  rotary.setErrorDelay(450);
 
   setupMotor();
   setupTimer1();
@@ -174,45 +290,209 @@ void setup() {
   welcomeScreen();     //Show welcome screen
 }
 
-
 void loop() {
 
-  readSensors();
-  displayTimeDate();
+  bool infoScreenDrawn;
+  bool menuDrawn;
+  byte dir = rotary.rotate();
+  byte push = rotary.push();
 
+  switch (state){
+
+    case INFO_SCREEN:
+
+      if (infoScreenDrawn == false){
+        drawStaticInfoScreen();
+        infoScreenDrawn = true;
+      }
+      if (millis() - timing > 1000){ // read & display data on screen every second
+        timing = millis();
+        readSensors();
+        displayTimeDate();
+        updateInfoScreen();
+      }
+      if (push == 1){
+        delay(50);
+        lcd.clear();
+        state = MENU1;
+      } 
+    break;
+
+    case MENU1:
+    
+      selectorPosition = 0;
+      if (menuDrawn == false){
+        drawStaticMenu();
+        menuDrawn = true;
+      }
+      if (selectorPosition > 3){
+        delay(50);
+        lcd.clear();
+        state = MENU2;
+      }  
+        
+      switch (selectorPosition){
+        case SET_PROGRAM :
+          clearSelector();
+          lcd.setCursor(0,0);
+          lcd.print("->");
+          if (push == 1){
+            delay(50);
+            lcd.clear();
+            state = M_PROGRAM;
+          } 
+        break;
+        case SET_SPEED :
+          clearSelector();
+          lcd.setCursor(0,1);
+          lcd.print("->");
+          if (push == 1){
+            delay(50);
+            lcd.clear();
+            state = M_SPEED;
+          } 
+        break;
+        case SET_LIGHT_A :
+          clearSelector();
+          lcd.setCursor(0,2);
+          lcd.print("->");
+          if (push == 1){
+            delay(50);
+            lcd.clear();
+            state = M_LIGHT_A;
+          } 
+        break;
+        case SET_LIGHT_B :
+          clearSelector();
+          lcd.setCursor(0,3);
+          lcd.print("->");
+          if (push == 1){
+            delay(50);
+            lcd.clear();
+            state = M_LIGHT_B;
+          } 
+        break;          
+      }
+    break;
+
+    case MENU2:
+      if (menuDrawn == false){
+        drawStaticMenu();
+        menuDrawn = true;
+      }
+      if (selectorPosition > 7){
+        delay(50);
+        lcd.clear();
+        state = MENU3;
+      }   
+      if (selectorPosition < 4){
+        delay(50);
+        lcd.clear();
+        state = MENU1;
+      } 
+
+      switch (selectorPosition){
+        case SET_AUX_A:
+          clearSelector();
+          lcd.setCursor(0,0);
+          lcd.print("->");
+          if (push == 1){
+            delay(50);
+            lcd.clear();
+            state = M_AUX_1;
+          } 
+        break;
+        case SET_AUX_B:
+          clearSelector();
+          lcd.setCursor(0,1);
+          lcd.print("->");
+          if (push == 1){
+            delay(200);
+            lcd.clear();
+            state = M_AUX_2;
+          } 
+        break;
+        case SET_TIME:
+          clearSelector();
+          lcd.setCursor(0,2);
+          lcd.print("->");
+          if (push == 1){
+            delay(200);
+            lcd.clear();
+            state = M_TIME;
+          } 
+        break;
+        case SET_DATE:
+          clearSelector();
+          lcd.setCursor(0,3);
+          lcd.print("->");
+          if (push == 1){
+            delay(200);
+            lcd.clear();
+            state = M_DATE;
+          } 
+        break;          
+      }   
+    break;
+
+    case MENU3:
+      if (menuDrawn == false){
+        drawStaticMenu();
+        menuDrawn = true;
+      }
+      if (selectorPosition < 8){
+        delay(50);
+        lcd.clear();
+        state = MENU2;
+      } 
+      switch (selectorPosition){
+        case SET_ALARM:
+          clearSelector();
+          lcd.setCursor(0,0);
+          lcd.print("->");
+          if (push == 1){
+            delay(50);
+            lcd.clear();
+            state = M_ALARM;
+          } 
+        break;
+        case SET_EEPROM:
+          clearSelector();
+          lcd.setCursor(0,1);
+          lcd.print("->");
+          if (push == 1){
+            delay(50);
+            lcd.clear();
+            state = M_EEPROM;
+          } 
+        break;
+        case BACK:
+          clearSelector();
+          lcd.setCursor(0,2);
+          lcd.print("->");
+          if (push == 1){
+            delay(50);
+            lcd.clear();
+            state = INFO_SCREEN;
+            selectorPosition = 0;
+          } 
+        break;          
+      }   
+    break;
+
+    case M_PROGRAM:
+      lcd.setCursor(2,0);
+      lcd.print("Program Selection");
+      lcd.setCursor(2,1);
+      lcd.print("Name:");
+      lcd.print(prg);
+      lcd.setCursor(2,2);
+      lcd.print("Start Program!");
+      lcd.setCursor(2,3);
+      lcd.print("Back");
+  }
   digitalWrite(relayApin, relayAStat); //Set lights to off
   digitalWrite(relayBpin, relayBStat);
-
-  //Info Screen 
-  
-  //Revolutions, day & program name
-  lcd.setCursor(0,0);
-  lcd.print("PRG:");
-  lcd.print("None");
-  lcd.setCursor(0,1);
-  lcd.print("Day:");
-  lcd.print(day);
-  
-  lcd.setCursor(10,0);
-  lcd.print("RPD:");
-  lcd.print(rpd);
-
-  //Temperature, Humidity & Luminosity readings
-  lcd.setCursor(10,1);
-  lcd.print("Tmp:"); 
-  lcd.print(tmp);
-  lcd.print((char)223);
-
-  lcd.setCursor(10,2);
-  lcd.print("Hum:"); 
-  lcd.print(hum);
-  lcd.print("%");
-  
-  lcd.setCursor(10,3);
-  lcd.print("Lux:"); 
-  lcd.setCursor(14,3);
-  lcd.print(lux);
-  lcd.print("     ");
 }
 
 
