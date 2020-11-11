@@ -12,6 +12,8 @@
 #include <Adafruit_TSL2561_U.h>
 #include <Adafruit_AM2320.h>
 #include <Buzzer.h>
+#include <Encoder.h>
+
 
 //Arduino Nano pin definitions
 
@@ -35,11 +37,7 @@ const int CSPin = 10;
 enum state {
   INFO_SCREEN,
   MENU1,
-  MENU2,
-  MENU3, 
-  M_TIME,
-  M_DATE,
-  M_ALARM,
+  MENU2, 
   M_PROGRAM,
   M_SPEED,
   M_LIGHT_A,
@@ -56,9 +54,6 @@ enum selectorPosition {
   SET_LIGHT_B,
   SET_AUX_A,
   SET_AUX_B,
-  SET_TIME,
-  SET_DATE,
-  SET_ALARM,
   SET_EEPROM,
   BACK
 };
@@ -73,11 +68,15 @@ int lux;                  //Current luminosity
 int speed;                //Rotation speed
 bool relayAStat;          //Light A 
 bool relayBStat;          //Light B
+bool auxAStat;
+bool auxBStat;
 unsigned long timing;     //timing for delays
 int selectorPosition = 0;
+long oldPosition  = -999;
 byte dir;
+byte push;
 
-SimpleRotary rotary (encoderA, encoderB, buttonPin);   //Encoder
+Encoder encoder(2, 3);
 LiquidCrystal_I2C lcd(0x27,20,4);   // LCD 2004 I2C LCD address 0x27; 20 chars; 4 line display
 TMC2130Stepper driver = TMC2130Stepper(LEDPin, dirPin, stepPin, CSPin);  //TMC2130 Stepper
 AccelStepper stepper = AccelStepper(stepper.DRIVER, stepPin, dirPin); //Accel Stepper Library
@@ -185,7 +184,7 @@ void updateInfoScreen(){
   lcd.setCursor(4,0);
   lcd.print(prg);
   lcd.setCursor(4,1);
-  lcd.print(day);
+  lcd.print(dir);
   lcd.setCursor(14,0);
   lcd.print(rpd);
   lcd.setCursor(14,1);
@@ -194,17 +193,6 @@ void updateInfoScreen(){
   lcd.print(hum); lcd.print("%");
   lcd.setCursor(14,3);
   lcd.print(lux); lcd.print("     ");
-}
-
-void clearSelector(){
-  lcd.setCursor(0,0);
-  lcd.print("  ");
-  lcd.setCursor(0,1);
-  lcd.print("  ");
-  lcd.setCursor(0,2);
-  lcd.print("  ");
-  lcd.setCursor(0,3);
-  lcd.print("  ");
 }
 
 void drawStaticMenu(){
@@ -224,35 +212,288 @@ void drawStaticMenu(){
     lcd.setCursor(2,1);
     lcd.print("Set Aux B");
     lcd.setCursor(2,2);
-    lcd.print("Set Time");
-    lcd.setCursor(2,3);
-    lcd.print("Set Date");
-  }
-  if (state == MENU3){
-    lcd.setCursor(2,0);
-    lcd.print("Set Alarm");
-    lcd.setCursor(2,1);
     lcd.print("Set EEPROM");
+    lcd.setCursor(2,3);
+    lcd.print("Exit");
+  }
+  if (state == M_PROGRAM){
+    lcd.setCursor(2,0);
+    lcd.print("Program Selection");
+    lcd.setCursor(2,1);
+    lcd.print("Name: ");
+    lcd.print(prg);
     lcd.setCursor(2,2);
-    lcd.print("Back");
+    lcd.print("Start Program!");
+    lcd.setCursor(2,3);
+    lcd.print("Exit");
+  }
+  if (state == M_SPEED){
+    lcd.setCursor(2,0);
+    lcd.print("Rotation Speed");
+    lcd.setCursor(2,1);
+    lcd.print("Rev./Day: ");
+    lcd.print(rpd);
+    lcd.setCursor(2,2);
+    lcd.print("Change");
+    lcd.setCursor(2,3);
+    lcd.print("Exit");
+  }
+  if (state == M_LIGHT_A){
+    lcd.setCursor(2,0);
+    lcd.print("Light A Schedule");
+    lcd.setCursor(2,1);
+    lcd.print("Status: ");
+    if (relayAStat == true){
+      lcd.print("ON");
+    }
+    else {
+      lcd.print("OFF");
+    }
+    lcd.setCursor(2,2);
+    lcd.print("Set Schedule:");
+    lcd.setCursor(2,3);
+    lcd.print("Exit");
+  }
+  if (state == M_LIGHT_B){
+    lcd.setCursor(2,0);
+    lcd.print("Light B Schedule");
+    lcd.setCursor(2,1);
+    lcd.print("Status: ");
+    if (relayBStat == true){
+      lcd.print("ON");
+    }
+    else {
+      lcd.print("OFF");
+    }
+    lcd.setCursor(2,2);
+    lcd.print("Set Schedule:");
+    lcd.setCursor(2,3);
+    lcd.print("Exit");
+  }
+  if (state == M_AUX_1){
+    lcd.setCursor(2,0);
+    lcd.print("Aux 12V A Schedule");
+    lcd.setCursor(2,1);
+    lcd.print("Status: ");
+    if (auxAStat == true){
+      lcd.print("ON");
+    }
+    else {
+      lcd.print("OFF");
+    }
+    lcd.setCursor(2,2);
+    lcd.print("Set Schedule:");
+    lcd.setCursor(2,3);
+    lcd.print("Exit");
+  }
+  if (state == M_AUX_2){
+    lcd.setCursor(2,0);
+    lcd.print("Aux 12V B Schedule");
+    lcd.setCursor(2,1);
+    lcd.print("Status: ");
+    if (auxBStat == true){
+      lcd.print("ON");
+    }
+    else {
+      lcd.print("OFF");
+    }
+    lcd.setCursor(2,2);
+    lcd.print("Set Schedule:");
+    lcd.setCursor(2,3);
+    lcd.print("Exit");
+  }
+  if (state == M_EEPROM){
+    lcd.setCursor(2,0);
+    lcd.print("EEPROM Settings");
+    lcd.setCursor(2,1);
+    lcd.print("Store to EEPROM");
+    lcd.setCursor(2,2);
+    lcd.print("Clear EEPROM");
+    lcd.setCursor(2,3);
+    lcd.print("Exit");
   }
 }
 
-void Selector(){
-  if (dir == 1){
-    selectorPosition += 1;
-  }
-  if (dir == 2){
-    selectorPosition -= 1;
-  }
-  if (selectorPosition < 0) {
-    selectorPosition = 0;
-  }
-  if (selectorPosition > 10) {
-    selectorPosition = 10;
+void Selector(){ 
+  /*int oldSelectorPosition;
+
+  if (selectorPosition == 0 || selectorPosition == 4) {
+    lcd.setCursor(0,0);
+    lcd.print(">>");
+    if (selectorPosition != oldSelectorPosition){
+      lcd.setCursor(0,0);
+      lcd.print("  ");
+      oldSelectorPosition = selectorPosition;
+    }
   }
 
+  if (selectorPosition == 1 || selectorPosition == 5) {
+    lcd.setCursor(0,1);
+    lcd.print(">>");
+    if (selectorPosition != oldSelectorPosition){
+      lcd.setCursor(0,1);
+      lcd.print("  ");
+      oldSelectorPosition = selectorPosition;
+    }
+  }
 
+  if (selectorPosition == 2 || selectorPosition == 6) {
+    lcd.setCursor(0,2);
+    lcd.print(">>");
+    if (selectorPosition != oldSelectorPosition){
+      lcd.setCursor(0,2);
+      lcd.print("  ");
+      oldSelectorPosition = selectorPosition;
+    }
+  }
+
+  if (selectorPosition == 3 || selectorPosition == 7) {
+    lcd.setCursor(0,3);
+    lcd.print(">>");
+    if (selectorPosition != oldSelectorPosition){
+      lcd.setCursor(0,3);
+      lcd.print("  ");
+      oldSelectorPosition = selectorPosition;
+    }
+  }*/
+
+
+  switch (selectorPosition){
+    case SET_PROGRAM :
+      lcd.setCursor(0,0);
+      lcd.print("->");
+      lcd.setCursor(0,1);
+      lcd.print("  ");
+      if (push == 1){
+        delay(50);
+        lcd.clear();
+        state = M_PROGRAM;
+      } 
+    break;
+    case SET_SPEED :
+      lcd.setCursor(0,0);
+      lcd.print("  ");
+      lcd.setCursor(0,1);
+      lcd.print("->");
+      lcd.setCursor(0,2);
+      lcd.print("  ");
+      if (push == 1){
+        delay(50);
+        lcd.clear();
+        state = M_SPEED;
+      } 
+    break;
+    case SET_LIGHT_A :
+      lcd.setCursor(0,1);
+      lcd.print("  ");
+      lcd.setCursor(0,2);
+      lcd.print("->");
+      lcd.setCursor(0,3);
+      lcd.print("  ");
+      if (push == 1){
+        delay(50);
+        lcd.clear();
+        state = M_LIGHT_A;
+      } 
+    break;
+    case SET_LIGHT_B : 
+      lcd.setCursor(0,2);
+      lcd.print("  ");                  
+      lcd.setCursor(0,3);
+      lcd.print("->");
+      if (push == 1){
+        delay(50);
+        lcd.clear();
+        state = M_LIGHT_B;
+      } 
+    break;
+    case SET_AUX_A:
+      lcd.setCursor(0,0);
+      lcd.print("->");
+      lcd.setCursor(0,1);
+      lcd.print("  ");
+      if (push == 1){
+        delay(50);
+        lcd.clear();
+        state = M_AUX_1;
+      } 
+    break;
+    case SET_AUX_B:
+      lcd.setCursor(0,0);
+      lcd.print("  ");
+      lcd.setCursor(0,1);
+      lcd.print("->");
+      lcd.setCursor(0,2);
+      lcd.print("  ");
+      if (push == 1){
+        delay(50);
+        lcd.clear();
+        state = M_AUX_2;
+      } 
+    break;
+    case SET_EEPROM:
+      lcd.setCursor(0,1);
+      lcd.print("  ");
+      lcd.setCursor(0,2);
+      lcd.print("->");
+      lcd.setCursor(0,3);
+      lcd.print("  ");
+      if (push == 1){
+        delay(50);
+        lcd.clear();
+        state = M_EEPROM;
+      } 
+    break;
+    case BACK:
+      lcd.setCursor(0,2);
+      lcd.print("  ");
+      lcd.setCursor(0,3);
+      lcd.print("->");
+      if (push == 1){
+        delay(50);
+        lcd.clear();
+        state = INFO_SCREEN;
+        selectorPosition = 0;
+      } 
+    break;              
+  } 
+}
+
+void readEncoder(){
+  long newPosition = encoder.read();
+  if (newPosition != oldPosition) {
+    if (newPosition > oldPosition+3){
+    dir = 2;
+    oldPosition = newPosition;
+    } 
+  if (newPosition < oldPosition-3) {
+    dir = 1;
+    oldPosition = newPosition;
+    }  
+  }
+  else {
+    dir = 0;
+  }
+}
+
+void buttonPress(){
+  int reading;           // the current reading from the input pin
+  static int previous = HIGH; 
+  long time = 0;         // the last time the output pin was toggled
+  long debounce = 200;   // the debounce time, increase if the output flickers  
+  
+  reading = digitalRead(buttonPin);
+
+  if (reading == LOW && previous == HIGH && (millis() - time) > debounce) {
+  //if (reading ==  && previous == HIGH) {
+    push = 1;
+    Serial.println("0");
+    time = millis();    
+  }
+  else {
+    push = 0;
+  }
+  previous = reading;
 }
 
 void setup() {
@@ -266,10 +507,6 @@ void setup() {
   am2320.begin();      // temp+humidity sensor init  
   tsl.begin();         // luminosity sensor init
 
-  rotary.setTrigger(HIGH);
-  rotary.setDebounceDelay(8);
-  rotary.setErrorDelay(450);
-
   setupMotor();
   setupTimer1();
   setupTSL();  
@@ -277,7 +514,7 @@ void setup() {
   
   pinMode(A0, OUTPUT); // light relay A
   pinMode(A1, OUTPUT); // light relay B
-  pinMode(A3, INPUT);  // encoder button
+  pinMode(A3, INPUT_PULLUP);  // encoder button
   pinMode(A6, INPUT);  // potentiometer 1
   pinMode(A7, INPUT);  // potentiometer 2
   pinMode(2, INPUT);   // encoder interrupt A
@@ -294,13 +531,15 @@ void loop() {
 
   bool infoScreenDrawn;
   bool menuDrawn;
-  byte dir = rotary.rotate();
-  byte push = rotary.push();
+  readEncoder();
+  buttonPress();
+  if (dir == 1) selectorPosition++;
+  if (dir == 2) selectorPosition--;
+  if (selectorPosition < 0) selectorPosition = 0;
+  if (selectorPosition > 7) selectorPosition = 7;
 
   switch (state){
-
     case INFO_SCREEN:
-
       if (infoScreenDrawn == false){
         drawStaticInfoScreen();
         infoScreenDrawn = true;
@@ -314,13 +553,13 @@ void loop() {
       if (push == 1){
         delay(50);
         lcd.clear();
+        infoScreenDrawn = false;
         state = MENU1;
       } 
     break;
-
+ 
     case MENU1:
-    
-      selectorPosition = 0;
+      Selector();
       if (menuDrawn == false){
         drawStaticMenu();
         menuDrawn = true;
@@ -328,171 +567,31 @@ void loop() {
       if (selectorPosition > 3){
         delay(50);
         lcd.clear();
+        menuDrawn = false;
         state = MENU2;
       }  
-        
-      switch (selectorPosition){
-        case SET_PROGRAM :
-          clearSelector();
-          lcd.setCursor(0,0);
-          lcd.print("->");
-          if (push == 1){
-            delay(50);
-            lcd.clear();
-            state = M_PROGRAM;
-          } 
-        break;
-        case SET_SPEED :
-          clearSelector();
-          lcd.setCursor(0,1);
-          lcd.print("->");
-          if (push == 1){
-            delay(50);
-            lcd.clear();
-            state = M_SPEED;
-          } 
-        break;
-        case SET_LIGHT_A :
-          clearSelector();
-          lcd.setCursor(0,2);
-          lcd.print("->");
-          if (push == 1){
-            delay(50);
-            lcd.clear();
-            state = M_LIGHT_A;
-          } 
-        break;
-        case SET_LIGHT_B :
-          clearSelector();
-          lcd.setCursor(0,3);
-          lcd.print("->");
-          if (push == 1){
-            delay(50);
-            lcd.clear();
-            state = M_LIGHT_B;
-          } 
-        break;          
-      }
     break;
 
     case MENU2:
+      Selector();
       if (menuDrawn == false){
         drawStaticMenu();
         menuDrawn = true;
-      }
-      if (selectorPosition > 7){
-        delay(50);
-        lcd.clear();
-        state = MENU3;
       }   
       if (selectorPosition < 4){
         delay(50);
         lcd.clear();
+        menuDrawn = false;
         state = MENU1;
-      } 
-
-      switch (selectorPosition){
-        case SET_AUX_A:
-          clearSelector();
-          lcd.setCursor(0,0);
-          lcd.print("->");
-          if (push == 1){
-            delay(50);
-            lcd.clear();
-            state = M_AUX_1;
-          } 
-        break;
-        case SET_AUX_B:
-          clearSelector();
-          lcd.setCursor(0,1);
-          lcd.print("->");
-          if (push == 1){
-            delay(200);
-            lcd.clear();
-            state = M_AUX_2;
-          } 
-        break;
-        case SET_TIME:
-          clearSelector();
-          lcd.setCursor(0,2);
-          lcd.print("->");
-          if (push == 1){
-            delay(200);
-            lcd.clear();
-            state = M_TIME;
-          } 
-        break;
-        case SET_DATE:
-          clearSelector();
-          lcd.setCursor(0,3);
-          lcd.print("->");
-          if (push == 1){
-            delay(200);
-            lcd.clear();
-            state = M_DATE;
-          } 
-        break;          
-      }   
-    break;
-
-    case MENU3:
-      if (menuDrawn == false){
-        drawStaticMenu();
-        menuDrawn = true;
-      }
-      if (selectorPosition < 8){
-        delay(50);
-        lcd.clear();
-        state = MENU2;
-      } 
-      switch (selectorPosition){
-        case SET_ALARM:
-          clearSelector();
-          lcd.setCursor(0,0);
-          lcd.print("->");
-          if (push == 1){
-            delay(50);
-            lcd.clear();
-            state = M_ALARM;
-          } 
-        break;
-        case SET_EEPROM:
-          clearSelector();
-          lcd.setCursor(0,1);
-          lcd.print("->");
-          if (push == 1){
-            delay(50);
-            lcd.clear();
-            state = M_EEPROM;
-          } 
-        break;
-        case BACK:
-          clearSelector();
-          lcd.setCursor(0,2);
-          lcd.print("->");
-          if (push == 1){
-            delay(50);
-            lcd.clear();
-            state = INFO_SCREEN;
-            selectorPosition = 0;
-          } 
-        break;          
       }   
     break;
 
     case M_PROGRAM:
-      lcd.setCursor(2,0);
-      lcd.print("Program Selection");
-      lcd.setCursor(2,1);
-      lcd.print("Name:");
-      lcd.print(prg);
-      lcd.setCursor(2,2);
-      lcd.print("Start Program!");
-      lcd.setCursor(2,3);
-      lcd.print("Back");
+    break;
   }
   digitalWrite(relayApin, relayAStat); //Set lights to off
   digitalWrite(relayBpin, relayBStat);
+  
 }
 
 
