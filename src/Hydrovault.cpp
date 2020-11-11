@@ -357,8 +357,9 @@ void Selector(){
     }
   }*/
 
+
   switch (selectorPosition){
-    case 0 :
+    case SET_PROGRAM :
       lcd.setCursor(0,0);
       lcd.print("->");
       lcd.setCursor(0,1);
@@ -369,7 +370,7 @@ void Selector(){
         state = M_PROGRAM;
       } 
     break;
-    case 1 :
+    case SET_SPEED :
       lcd.setCursor(0,0);
       lcd.print("  ");
       lcd.setCursor(0,1);
@@ -382,7 +383,7 @@ void Selector(){
         state = M_SPEED;
       } 
     break;
-    case 2 :
+    case SET_LIGHT_A :
       lcd.setCursor(0,1);
       lcd.print("  ");
       lcd.setCursor(0,2);
@@ -395,7 +396,7 @@ void Selector(){
         state = M_LIGHT_A;
       } 
     break;
-    case 3 : 
+    case SET_LIGHT_B : 
       lcd.setCursor(0,2);
       lcd.print("  ");                  
       lcd.setCursor(0,3);
@@ -406,7 +407,7 @@ void Selector(){
         state = M_LIGHT_B;
       } 
     break;
-    case 4:
+    case SET_AUX_A:
       lcd.setCursor(0,0);
       lcd.print("->");
       lcd.setCursor(0,1);
@@ -417,7 +418,7 @@ void Selector(){
         state = M_AUX_1;
       } 
     break;
-    case 5:
+    case SET_AUX_B:
       lcd.setCursor(0,0);
       lcd.print("  ");
       lcd.setCursor(0,1);
@@ -430,7 +431,7 @@ void Selector(){
         state = M_AUX_2;
       } 
     break;
-    case 6:
+    case SET_EEPROM:
       lcd.setCursor(0,1);
       lcd.print("  ");
       lcd.setCursor(0,2);
@@ -443,7 +444,7 @@ void Selector(){
         state = M_EEPROM;
       } 
     break;
-    case 7:
+    case BACK:
       lcd.setCursor(0,2);
       lcd.print("  ");
       lcd.setCursor(0,3);
@@ -477,15 +478,16 @@ void readEncoder(){
 
 void buttonPress(){
   int reading;           // the current reading from the input pin
-  int previous = 1; 
+  static int previous = HIGH; 
   long time = 0;         // the last time the output pin was toggled
   long debounce = 200;   // the debounce time, increase if the output flickers  
   
   reading = digitalRead(buttonPin);
 
-  if (reading == LOW && previous == HIGH && millis() - time > debounce) {
-
+  if (reading == LOW && previous == HIGH && (millis() - time) > debounce) {
+  //if (reading ==  && previous == HIGH) {
     push = 1;
+    Serial.println("0");
     time = millis();    
   }
   else {
