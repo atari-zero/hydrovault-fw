@@ -46,7 +46,7 @@ enum state {
   M_AUX_2,
   M_EEPROM,
 };
-
+/*
 enum selectorPosition {
   SET_PROGRAM,
   SET_SPEED,
@@ -57,7 +57,7 @@ enum selectorPosition {
   SET_EEPROM,
   BACK
 };
-
+*/
 int state = INFO_SCREEN;  //Screen state
 int rpd;                  //Revolutions per day
 int prg;                  //Program No
@@ -70,8 +70,10 @@ bool relayAStat;          //Light A
 bool relayBStat;          //Light B
 bool auxAStat;
 bool auxBStat;
+bool programStarted;
 unsigned long timing;     //timing for delays
 int selectorPosition = 0;
+int selectedPogram;
 long oldPosition  = -999;
 byte dir;
 byte push;
@@ -218,20 +220,19 @@ void drawStaticMenu(){
   }
   if (state == M_PROGRAM){
     lcd.setCursor(2,0);
-    lcd.print("Program Selection");
+    lcd.print("Program Selection:");
     lcd.setCursor(2,1);
     lcd.print("Name: ");
-    lcd.print(prg);
     lcd.setCursor(2,2);
-    lcd.print("Start Program!");
+    lcd.print("Restart Program!");
     lcd.setCursor(2,3);
     lcd.print("Exit");
   }
   if (state == M_SPEED){
     lcd.setCursor(2,0);
-    lcd.print("Rotation Speed");
+    lcd.print("Rotation Speed:");
     lcd.setCursor(2,1);
-    lcd.print("Rev./Day: ");
+    lcd.print("Revs/Day: ");
     lcd.print(rpd);
     lcd.setCursor(2,2);
     lcd.print("Change");
@@ -240,15 +241,9 @@ void drawStaticMenu(){
   }
   if (state == M_LIGHT_A){
     lcd.setCursor(2,0);
-    lcd.print("Light A Schedule");
+    lcd.print("Light A Control:");
     lcd.setCursor(2,1);
     lcd.print("Status: ");
-    if (relayAStat == true){
-      lcd.print("ON");
-    }
-    else {
-      lcd.print("OFF");
-    }
     lcd.setCursor(2,2);
     lcd.print("Set Schedule:");
     lcd.setCursor(2,3);
@@ -256,15 +251,9 @@ void drawStaticMenu(){
   }
   if (state == M_LIGHT_B){
     lcd.setCursor(2,0);
-    lcd.print("Light B Schedule");
+    lcd.print("Light B Control:");
     lcd.setCursor(2,1);
     lcd.print("Status: ");
-    if (relayBStat == true){
-      lcd.print("ON");
-    }
-    else {
-      lcd.print("OFF");
-    }
     lcd.setCursor(2,2);
     lcd.print("Set Schedule:");
     lcd.setCursor(2,3);
@@ -272,15 +261,9 @@ void drawStaticMenu(){
   }
   if (state == M_AUX_1){
     lcd.setCursor(2,0);
-    lcd.print("Aux 12V A Schedule");
+    lcd.print("Aux12V A Control:");
     lcd.setCursor(2,1);
     lcd.print("Status: ");
-    if (auxAStat == true){
-      lcd.print("ON");
-    }
-    else {
-      lcd.print("OFF");
-    }
     lcd.setCursor(2,2);
     lcd.print("Set Schedule:");
     lcd.setCursor(2,3);
@@ -288,15 +271,9 @@ void drawStaticMenu(){
   }
   if (state == M_AUX_2){
     lcd.setCursor(2,0);
-    lcd.print("Aux 12V B Schedule");
+    lcd.print("Aux12V B Control:");
     lcd.setCursor(2,1);
     lcd.print("Status: ");
-    if (auxBStat == true){
-      lcd.print("ON");
-    }
-    else {
-      lcd.print("OFF");
-    }
     lcd.setCursor(2,2);
     lcd.print("Set Schedule:");
     lcd.setCursor(2,3);
@@ -304,7 +281,7 @@ void drawStaticMenu(){
   }
   if (state == M_EEPROM){
     lcd.setCursor(2,0);
-    lcd.print("EEPROM Settings");
+    lcd.print("EEPROM Settings:");
     lcd.setCursor(2,1);
     lcd.print("Store to EEPROM");
     lcd.setCursor(2,2);
@@ -314,17 +291,20 @@ void drawStaticMenu(){
   }
 }
 
-void Selector(){ 
-
-  if (state == MENU1 || state == MENU2){
-    if (selectorPosition == 0 || selectorPosition == 4) {
+void drawSelector(){ 
+  if (dir == 1) selectorPosition++;
+  if (dir == 2) selectorPosition--;
+  if (selectorPosition < -1) selectorPosition = 0;
+  if (selectorPosition > 4) selectorPosition = 3;
+  if (state != INFO_SCREEN){
+    if (selectorPosition == 0) {
       lcd.setCursor(0,0);
       lcd.print(">>");
       lcd.setCursor(0,1);
       lcd.print("  ");
     }
 
-    if (selectorPosition == 1 || selectorPosition == 5) {
+    if (selectorPosition == 1) {
       lcd.setCursor(0,0);
       lcd.print("  ");
       lcd.setCursor(0,1);
@@ -333,7 +313,7 @@ void Selector(){
       lcd.print("  ");
     }
 
-    if (selectorPosition == 2 || selectorPosition == 6) {
+    if (selectorPosition == 2) {
       lcd.setCursor(0,1);
       lcd.print("  ");
       lcd.setCursor(0,2);
@@ -342,44 +322,24 @@ void Selector(){
       lcd.print("  ");
     }
 
-    if (selectorPosition == 3 || selectorPosition == 7) {
+    if (selectorPosition == 3) {
       lcd.setCursor(0,2);
       lcd.print("  ");
       lcd.setCursor(0,3);
       lcd.print(">>");
     }
-  
-    if (push == 1){
-      lcd.clear();
-      delay(50);
-      switch (selectorPosition){
-        case SET_PROGRAM :
-          state = M_PROGRAM;
-        break;
-        case SET_SPEED :
-            state = M_SPEED;
-        break;
-        case SET_LIGHT_A :
-            state = M_LIGHT_A;
-        break;
-        case SET_LIGHT_B : 
-            state = M_LIGHT_B;
-        break;
-        case SET_AUX_A:
-            state = M_AUX_1;
-        break;
-        case SET_AUX_B:
-            state = M_AUX_2;
-        break;
-        case SET_EEPROM:
-            state = M_EEPROM;
-        break;
-        case BACK:
-            state = INFO_SCREEN;
-        break; 
-      }             
-    } 
   }
+}
+
+void clearSelector(){
+  lcd.setCursor(0,0);
+  lcd.print("  ");
+  lcd.setCursor(0,1);
+  lcd.print("  ");
+  lcd.setCursor(0,2);
+  lcd.print("  ");
+  lcd.setCursor(0,3);
+  lcd.print("  "); 
 }
 
 void readEncoder(){
@@ -410,7 +370,6 @@ void buttonPress(){
   if (reading == LOW && previous == HIGH && (millis() - time) > debounce) {
   //if (reading ==  && previous == HIGH) {
     push = 1;
-    Serial.println("0");
     time = millis();    
   }
   else {
@@ -456,13 +415,9 @@ void loop() {
   bool menuDrawn;
   readEncoder();
   buttonPress();
-  if (dir == 1) selectorPosition++;
-  if (dir == 2) selectorPosition--;
-  if (selectorPosition < 0) selectorPosition = 0;
-  if (selectorPosition > 7) selectorPosition = 7;
 
   switch (state){
-    case INFO_SCREEN:
+    case INFO_SCREEN :
       if (infoScreenDrawn == false){
         drawStaticInfoScreen();
         selectorPosition = 0;
@@ -480,45 +435,212 @@ void loop() {
         infoScreenDrawn = false;
         state = MENU1;
       } 
-    break;
+      break;
  
-    case MENU1:
-      Selector();
+    case MENU1 :
+      drawSelector();
       if (menuDrawn == false){
         drawStaticMenu();
         menuDrawn = true;
       }
-      if (selectorPosition > 3){
-        delay(50);
-        lcd.clear();
-        menuDrawn = false;
-        state = MENU2;
-      }  
-    break;
+      if (selectorPosition == 4){
+        if (dir == 1){
+          delay(50);
+          lcd.clear();
+          menuDrawn = false;
+          state = MENU2;
+          selectorPosition = 0;         
+        }
+      }
+      if (push == 1) lcd.clear();
+      if (push == 1 && selectorPosition == 0) state = M_PROGRAM;
+      if (push == 1 && selectorPosition == 1) state = M_SPEED;
+      if (push == 1 && selectorPosition == 2) state = M_LIGHT_A;
+      if (push == 1 && selectorPosition == 3) state = M_LIGHT_B;
+      break;
 
-    case MENU2:
-      Selector();
+    case MENU2 :
+      drawSelector();
       if (menuDrawn == false){
         drawStaticMenu();
         menuDrawn = true;
       }   
-      if (selectorPosition < 4){
-        delay(50);
-        lcd.clear();
-        menuDrawn = false;
-        state = MENU1;
-      }   
+      if (selectorPosition == -1){
+        if (dir == 2){
+          delay(50);
+          lcd.clear();
+          menuDrawn = false;
+          state = MENU1;
+          selectorPosition = 3;
+        }
+      } 
+      if (push == 1) lcd.clear();
+      if (push == 1 && selectorPosition == 0) state = M_AUX_1; 
+      if (push == 1 && selectorPosition == 1) state = M_AUX_2;
+      if (push == 1 && selectorPosition == 2) state = M_EEPROM;
+      if (push == 1 && selectorPosition == 3) state = INFO_SCREEN;  
+      break;
+
+    case M_PROGRAM :
+      drawSelector();
+      if (menuDrawn == false){
+        drawStaticMenu();
+        menuDrawn = true;
+      }
+      if(programStarted == true){
+        lcd.setCursor(8,1);
+        lcd.print(prg);
+        lcd.print(" Running!");  
+      }
+      if (push == 1){
+        switch (selectorPosition){
+          case 1 :
+            lcd.setCursor(8,1);
+            lcd.print("  ");
+            selectedPogram++;
+            lcd.setCursor(8,1);
+            lcd.print(selectedPogram);
+            break;
+          case 2 :
+            programStarted = true;
+            day = 1;
+            prg = selectedPogram;           
+            break;
+          case 3:
+            lcd.clear();
+            state = MENU1;
+            selectorPosition = 0;
+            break;
+        }
+      }         
     break;
 
-    case M_PROGRAM:
+    case M_SPEED :
+      drawSelector();
       if (menuDrawn == false){
-      drawStaticMenu();
-      menuDrawn = true;
-    break;
+        drawStaticMenu();
+        menuDrawn = true;
+        if (push == 1){
+          switch (selectorPosition){
+            case 1 :
+              break;
+            case 2 :
+              break;
+            case 3:
+              lcd.clear();
+              state = MENU1;
+              selectorPosition = 1;
+              break;
+          }
+        } 
+      } 
+      break;
+
+    case M_LIGHT_A :
+      drawSelector();
+      if (menuDrawn == false){
+        drawStaticMenu();
+        menuDrawn = true;
+        if (push == 1){
+          switch (selectorPosition){
+            case 1 :
+              break;
+            case 2 :
+              break;
+            case 3:
+              lcd.clear();
+              state = MENU1;
+              selectorPosition = 2;
+              break;
+          }
+        } 
+      } 
+      break;
+
+    case M_LIGHT_B :
+      drawSelector();
+      if (menuDrawn == false){
+        drawStaticMenu();
+        menuDrawn = true;
+        if (push == 1){
+          switch (selectorPosition){
+            case 1 :
+              break;
+            case 2 :
+              break;
+            case 3:
+              lcd.clear();
+              state = MENU1;
+              selectorPosition = 3;
+              break;
+          }
+        } 
+      } 
+      break;
+
+    case M_AUX_1 :
+      drawSelector();
+      if (menuDrawn == false){
+        drawStaticMenu();
+        menuDrawn = true;
+        if (push == 1){
+          switch (selectorPosition){
+            case 1 :
+              break;
+            case 2 :
+              break;
+            case 3:
+              lcd.clear();
+              state = MENU2;
+              selectorPosition = 0;
+              break;
+          }
+        } 
+      } 
+      break;
+
+    case M_AUX_2 :
+      drawSelector();
+      if (menuDrawn == false){
+        drawStaticMenu();
+        menuDrawn = true;
+        if (push == 1){
+          switch (selectorPosition){
+            case 1 :
+              break;
+            case 2 :
+              break;
+            case 3:
+              lcd.clear();
+              state = MENU2;
+              selectorPosition = 1;
+              break;
+          }
+        } 
+      } 
+      break;
+
+    case M_EEPROM :
+      drawSelector();
+      if (menuDrawn == false){
+        drawStaticMenu();
+        menuDrawn = true;
+        if (push == 1){
+          switch (selectorPosition){
+            case 1 :
+              break;
+            case 2 :
+              break;
+            case 3:
+              lcd.clear();
+              state = MENU2;
+              selectorPosition = 2;
+              break;
+          }
+        } 
+      } 
+      break;
   }
-  digitalWrite(relayApin, relayAStat); //Set lights to off
-  digitalWrite(relayBpin, relayBStat);
-  
 }
 
 
