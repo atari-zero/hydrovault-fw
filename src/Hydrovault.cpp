@@ -13,7 +13,7 @@
 #include <Adafruit_AM2320.h>
 #include <Buzzer.h>
 #include <Encoder.h>
-
+#include <EEPROM.h>
 
 //Arduino Nano pin definitions
 
@@ -46,18 +46,20 @@ enum state {
   M_AUX_2,
   M_EEPROM,
 };
-/*
-enum selectorPosition {
-  SET_PROGRAM,
-  SET_SPEED,
-  SET_LIGHT_A,
-  SET_LIGHT_B,
-  SET_AUX_A,
-  SET_AUX_B,
-  SET_EEPROM,
-  BACK
+
+struct eepromData
+{
+  int storedPrg;
+  int storedDay;
+  int storedRpd;
+  bool storedProgStarted;
+  bool storedRelayA;
+  bool storedRelayB;
+  bool storedAuxA;
+  bool storedAuxB;
+  long storedDayCount;
 };
-*/
+
 int state = INFO_SCREEN;  //Screen state
 int rpd;                  //Revolutions per day
 int prg;                  //Program No
@@ -75,6 +77,8 @@ unsigned long timing;     //timing for delays
 int selectorPosition = 0;
 int selectedPogram;
 long oldPosition  = -999;
+int eeAddress = 0;
+unsigned long dayCount;
 byte dir;
 byte push;
 
@@ -400,6 +404,72 @@ void beepConfirm(){
   buzzer.sound(0, 10);
 }
 
+void clearEEPROM(){
+  for (int i = 0 ; i < EEPROM.length() ; i++) {
+    EEPROM.write(i, 0);
+  }
+}
+
+void writeToEEPROM(){
+  eepromData HVData = {
+    prg,
+    day,
+    rpd,
+    programStarted,
+    relayAStat,
+    relayBStat,
+    auxAStat,
+    auxBStat,
+    dayCount
+  };
+  EEPROM.put(eeAddress, HVData);
+}
+
+void readFromEEPROM(){
+  eepromData HVData;
+  EEPROM.get(eeAddress, HVData);
+  prg = HVData.storedPrg;
+  day = HVData.storedDay;
+  rpd = HVData.storedRpd;
+  programStarted = HVData.storedProgStarted;
+  relayAStat = HVData.storedRelayA;
+  relayBStat = HVData.storedRelayB;
+  auxAStat = HVData.storedRelayA;
+  auxBStat = HVData.storedRelayB;
+  dayCount = HVData.storedDayCount;
+}
+
+void runProgram(){
+  digitalWrite(relayApin, relayAStat);
+  digitalWrite(relayBpin, relayBStat);
+  digitalWrite(vOutApin, auxAStat);
+  digitalWrite(vOutBpin, auxBStat);
+  if (programStarted == true){
+    switch (prg){
+      case 1 :
+      {
+      DateTime now = rtc.now();
+      if (now.hour() > 6 && now.hour() < 23){
+        relayAStat = true;
+        relayBStat = true;
+      }
+      if ((dayCount + 86400L) == now.unixtime()){
+        day++;
+        dayCount = now.unixtime();
+        writeToEEPROM();
+      }
+      break;
+      }
+      case 2 :
+      {
+      break;}
+      case 3 :
+      {
+      break;}
+    }
+  }
+}
+
 void setup() {
 
   SPI.begin();
@@ -428,6 +498,11 @@ void setup() {
   pinMode(6, OUTPUT);  // 12V Mosfet-regulated terminal B
   pinMode(9, OUTPUT);  // just a LED
 
+  readFromEEPROM();
+
+  DateTime now = rtc.now();
+  if (now.unixtime() > dayCount + 86400) dayCount = now.unixtime();
+
   welcomeScreen();     //Show welcome screen
 }
 
@@ -437,6 +512,7 @@ void loop() {
   bool menuDrawn;
   readEncoder();
   buttonPress();
+  runProgram();
 
   switch (state){
     case INFO_SCREEN :
@@ -525,30 +601,39 @@ void loop() {
       if (push == 1){
         switch (selectorPosition){
           case 1 :
+            {
             beep2();
             programStarted = false;
             lcd.setCursor(8,1);
             lcd.print("  ");
             selectedPogram++;
+            if (selectedPogram > 3) selectedPogram = 1;
             lcd.setCursor(8,1);
             lcd.print(selectedPogram);
             break;
+            }
           case 2 :
+            {
             beepConfirm();
             programStarted = true;
             day = 1;
             prg = selectedPogram; 
+            DateTime now = rtc.now();
+            dayCount = now.unixtime();
             lcd.setCursor(8,1);
             lcd.print("  ");
             lcd.setCursor(8,1);
             lcd.print(prg);          
             break;
+            }
           case 3:
+            {  
             beep();
             lcd.clear();
             state = MENU1;
-            selectorPosition = 0;
-            break;
+            selectorPosition = 1;
+            break; 
+            }       
         }
       }         
     break;
@@ -737,8 +822,12 @@ void loop() {
         if (push == 1){
           switch (selectorPosition){
             case 1 :
+              writeToEEPROM();
+              beepConfirm();
               break;
             case 2 :
+              clearEEPROM();
+              beepConfirm();
               break;
             case 3:
               beep();
