@@ -198,7 +198,9 @@ void updateInfoScreen(){
   lcd.setCursor(14,2);
   lcd.print(hum); lcd.print("%");
   lcd.setCursor(14,3);
-  lcd.print(lux); lcd.print("     ");
+  lcd.print("      ");
+  lcd.setCursor(14,3);
+  lcd.print(lux);
 }
 
 void drawStaticMenu(){
@@ -453,6 +455,10 @@ void runProgram(){
         relayAStat = true;
         relayBStat = true;
       }
+      else {
+        relayAStat = false;
+        relayBStat = false;
+      }
       if ((dayCount + 86400L) == now.unixtime()){
         day++;
         dayCount = now.unixtime();
@@ -512,6 +518,7 @@ void loop() {
   bool menuDrawn;
   readEncoder();
   buttonPress();
+
   runProgram();
 
   switch (state){
@@ -521,10 +528,10 @@ void loop() {
         selectorPosition = 0;
         infoScreenDrawn = true;
       }
-      if (millis() - timing > 1000){ // read & display data on screen every second
+      if (millis() - timing > 5000){ // read & display data on screen every second
         timing = millis();
-        readSensors();
         displayTimeDate();
+        readSensors();
         updateInfoScreen();
       }
       if (push == 1){
