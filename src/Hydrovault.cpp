@@ -11,6 +11,7 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_TSL2561_U.h>
 #include <Adafruit_AM2320.h>
+//#include <Adafruit_BME280.h>
 #include <Buzzer.h>
 #include <Encoder.h>
 #include <EEPROM.h>
@@ -74,6 +75,7 @@ bool auxAStat;
 bool auxBStat;
 bool programStarted;
 unsigned long timing;     //timing for delays
+unsigned long timingSensors;
 int selectorPosition = 0;
 int selectedPogram;
 long oldPosition  = -999;
@@ -88,6 +90,7 @@ TMC2130Stepper driver = TMC2130Stepper(LEDPin, dirPin, stepPin, CSPin);  //TMC21
 AccelStepper stepper = AccelStepper(stepper.DRIVER, stepPin, dirPin); //Accel Stepper Library
 RTC_DS1307 rtc; //Real Time Clock DS3107+
 Buzzer buzzer(buzzerPin); //Buzzer
+//Adafruit_BME280 bme;
 Adafruit_AM2320 am2320 = Adafruit_AM2320(); //Adafruit AM2320 Temp & Humidity sensor
 Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345); //Adafruit TSL2561 Luminosity sensor
 
@@ -154,8 +157,8 @@ void welcomeScreen(){
 }
 
 void readSensors(){
-  tmp = am2320.readTemperature();
-  hum = am2320.readHumidity();
+  tmp = am2320.readTemperature(); //bme.readTemperature(); //
+  hum = am2320.readHumidity(); //bme.readHumidity(); //
   sensors_event_t event;
   tsl.getEvent(&event);
   lux = event.light;
@@ -374,7 +377,6 @@ void buttonPress(){
   reading = digitalRead(buttonPin);
 
   if (reading == LOW && previous == HIGH && (millis() - time) > debounce) {
-  //if (reading ==  && previous == HIGH) {
     push = 1;
     time = millis();    
   }
@@ -459,11 +461,12 @@ void runProgram(){
         relayAStat = false;
         relayBStat = false;
       }
-      if ((dayCount + 86400L) == now.unixtime()){
-        day++;
-        dayCount = now.unixtime();
-        writeToEEPROM();
-      }
+      day = (((now.unixtime() - dayCount) / 86400L) + 1);
+      //if ((dayCount + 86400L) == now.unixtime()){
+      //  day++;
+      //  dayCount = now.unixtime();
+      //  writeToEEPROM();
+      //}
       break;
       }
       case 2 :
@@ -485,6 +488,7 @@ void setup() {
   lcd.init();          // initialize the lcd 
   lcd.backlight();     // turn on lcd backlight 
   am2320.begin();      // temp+humidity sensor init  
+  //bme.begin();  
   tsl.begin();         // luminosity sensor init
 
   setupMotor();
@@ -506,8 +510,8 @@ void setup() {
 
   readFromEEPROM();
 
-  DateTime now = rtc.now();
-  if (now.unixtime() > dayCount + 86400) dayCount = now.unixtime();
+  //DateTime now = rtc.now();
+  //if (now.unixtime() > dayCount + 86400) dayCount = now.unixtime();
 
   welcomeScreen();     //Show welcome screen
 }
@@ -518,7 +522,6 @@ void loop() {
   bool menuDrawn;
   readEncoder();
   buttonPress();
-
   runProgram();
 
   switch (state){
@@ -528,10 +531,13 @@ void loop() {
         selectorPosition = 0;
         infoScreenDrawn = true;
       }
-      if (millis() - timing > 5000){ // read & display data on screen every second
-        timing = millis();
-        displayTimeDate();
+      if (millis() - timingSensors > 6000) {
         readSensors();
+        timingSensors = millis();
+      }
+      if (millis() - timing > 1000){ // read & display data on screen every second
+        timing = millis();
+        displayTimeDate();       
         updateInfoScreen();
       }
       if (push == 1){
@@ -623,7 +629,7 @@ void loop() {
             {
             beepConfirm();
             programStarted = true;
-            day = 1;
+            //day = 1;
             prg = selectedPogram; 
             DateTime now = rtc.now();
             dayCount = now.unixtime();
