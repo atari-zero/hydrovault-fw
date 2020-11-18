@@ -415,6 +415,27 @@ void beepConfirm(){
   buzzer.sound(0, 10);
 }
 
+void beepStart(){
+  buzzer.begin(10);
+  buzzer.sound(NOTE_E3, 80);
+  buzzer.sound(0, 150);
+  buzzer.sound(NOTE_E4, 80);
+  buzzer.sound(0, 150);
+  buzzer.sound(NOTE_E5, 80);
+  buzzer.sound(0, 150);
+  buzzer.sound(NOTE_E5, 80);
+  buzzer.sound(0, 150); 
+  buzzer.sound(NOTE_A6, 200); 
+  buzzer.sound(NOTE_D4, 300);
+  buzzer.sound(NOTE_F4, 400);
+  buzzer.sound(NOTE_D6, 80); 
+  buzzer.sound(NOTE_E6, 80);  
+  buzzer.sound(NOTE_F6, 80); 
+  buzzer.sound(0, 200);
+  buzzer.sound(NOTE_F7, 300);
+  buzzer.end(2000);
+}
+
 void clearEEPROM(){
   for (int i = 0 ; i < EEPROM.length() ; i++) {
     EEPROM.write(i, 0);
@@ -524,6 +545,7 @@ void setup() {
   //if (now.unixtime() > dayCount + 86400) dayCount = now.unixtime();
 
   welcomeScreen();     //Show welcome screen
+  beepStart();
 }
 
 void loop() {
