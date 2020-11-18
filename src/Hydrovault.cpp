@@ -20,6 +20,7 @@
 
 const int relayApin = A0;
 const int relayBpin = A1;
+const int sensorPower = A2;
 const int buttonPin = A3;
 const int potApin = A6;
 const int potBpin = A7;
@@ -76,6 +77,7 @@ bool auxBStat;
 bool programStarted;
 unsigned long timing;     //timing for delays
 unsigned long timingSensors;
+unsigned long sensorWatchDogTimer;
 int selectorPosition = 0;
 int selectedPogram;
 long oldPosition  = -999;
@@ -162,6 +164,11 @@ void readSensors(){
   sensors_event_t event;
   tsl.getEvent(&event);
   lux = event.light;
+  if (hum == 0 && tmp == 0 && (millis() - sensorWatchDogTimer > 10000)){
+    digitalWrite (sensorPower, LOW);
+    delay(500);
+    digitalWrite (sensorPower, HIGH);
+  }
 }
 
 void displayTimeDate(){
@@ -481,6 +488,8 @@ void runProgram(){
 
 void setup() {
 
+  digitalWrite(sensorPower, HIGH);
+
   SPI.begin();
   Wire.begin();
   Serial.begin(9600);
@@ -498,6 +507,7 @@ void setup() {
   
   pinMode(A0, OUTPUT); // light relay A
   pinMode(A1, OUTPUT); // light relay B
+  pinMode(A2, OUTPUT); //AM2320 Power
   pinMode(A3, INPUT_PULLUP);  // encoder button
   pinMode(A6, INPUT);  // potentiometer 1
   pinMode(A7, INPUT);  // potentiometer 2
