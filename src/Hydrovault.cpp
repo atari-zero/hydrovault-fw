@@ -3,7 +3,6 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <SimpleRotary.h>
 #include <TMC2130Stepper.h>
 #include <AccelStepper.h>
 #include <RTClib.h>
@@ -11,10 +10,10 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_TSL2561_U.h>
 #include <Adafruit_AM2320.h>
-//#include <Adafruit_BME280.h>
 #include <Buzzer.h>
 #include <Encoder.h>
 #include <EEPROM.h>
+#include <avr/wdt.h>
 
 //Arduino Nano pin definitions
 
@@ -62,7 +61,7 @@ struct eepromData
   long storedDayCount;
 };
 
-int state = INFO_SCREEN;  //Screen state
+
 int rpd;                  //Revolutions per day
 int prg;                  //Program No
 int day;                  //Days passed since beginning
@@ -70,19 +69,24 @@ int tmp;                  //Current temperature
 int hum;                  //Current humidity  
 int lux;                  //Current luminosity
 int speed;                //Rotation speed
+
+int state = INFO_SCREEN;  //Screen state
+int selectorPosition = 0;
+int selectedPogram;
+int eeAddress = 0;
+
 bool relayAStat;          //Light A 
 bool relayBStat;          //Light B
 bool auxAStat;
 bool auxBStat;
 bool programStarted;
+
+long oldPosition  = -999; //encoder position
 unsigned long timing;     //timing for delays
 unsigned long timingSensors;
 unsigned long sensorWatchDogTimer;
-int selectorPosition = 0;
-int selectedPogram;
-long oldPosition  = -999;
-int eeAddress = 0;
 unsigned long dayCount;
+
 byte dir;
 byte push;
 
@@ -92,7 +96,6 @@ TMC2130Stepper driver = TMC2130Stepper(LEDPin, dirPin, stepPin, CSPin);  //TMC21
 AccelStepper stepper = AccelStepper(stepper.DRIVER, stepPin, dirPin); //Accel Stepper Library
 RTC_DS1307 rtc; //Real Time Clock DS3107+
 Buzzer buzzer(buzzerPin); //Buzzer
-//Adafruit_BME280 bme;
 Adafruit_AM2320 am2320 = Adafruit_AM2320(); //Adafruit AM2320 Temp & Humidity sensor
 Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT, 12345); //Adafruit TSL2561 Luminosity sensor
 
@@ -159,8 +162,8 @@ void welcomeScreen(){
 }
 
 void readSensors(){
-  tmp = am2320.readTemperature(); //bme.readTemperature(); //
-  hum = am2320.readHumidity(); //bme.readHumidity(); //
+  tmp = am2320.readTemperature(); 
+  hum = am2320.readHumidity(); 
   sensors_event_t event;
   tsl.getEvent(&event);
   lux = event.light;
@@ -433,7 +436,7 @@ void beepStart(){
   buzzer.sound(NOTE_F6, 80); 
   buzzer.sound(0, 200);
   buzzer.sound(NOTE_F7, 300);
-  buzzer.end(2000);
+  buzzer.end(200);
 }
 
 void clearEEPROM(){
@@ -472,6 +475,7 @@ void readFromEEPROM(){
 }
 
 void runProgram(){
+  wdt_reset();
   digitalWrite(relayApin, relayAStat);
   digitalWrite(relayBpin, relayBStat);
   digitalWrite(vOutApin, auxAStat);
@@ -490,11 +494,6 @@ void runProgram(){
         relayBStat = false;
       }
       day = (((now.unixtime() - dayCount) / 86400L) + 1);
-      //if ((dayCount + 86400L) == now.unixtime()){
-      //  day++;
-      //  dayCount = now.unixtime();
-      //  writeToEEPROM();
-      //}
       break;
       }
       case 2 :
@@ -518,8 +517,9 @@ void setup() {
   lcd.init();          // initialize the lcd 
   lcd.backlight();     // turn on lcd backlight 
   am2320.begin();      // temp+humidity sensor init  
-  //bme.begin();  
   tsl.begin();         // luminosity sensor init
+
+  wdt_enable(WDTO_8S);
 
   setupMotor();
   setupTimer1();
@@ -541,15 +541,13 @@ void setup() {
 
   readFromEEPROM();
 
-  //DateTime now = rtc.now();
-  //if (now.unixtime() > dayCount + 86400) dayCount = now.unixtime();
-
   welcomeScreen();     //Show welcome screen
   beepStart();
 }
 
 void loop() {
 
+  wdt_reset();
   bool infoScreenDrawn;
   bool menuDrawn;
   readEncoder();
@@ -558,6 +556,7 @@ void loop() {
 
   switch (state){
     case INFO_SCREEN :
+      wdt_reset();
       if (infoScreenDrawn == false){
         drawStaticInfoScreen();
         selectorPosition = 0;
@@ -582,6 +581,7 @@ void loop() {
       break;
  
     case MENU1 :
+      wdt_reset();
       drawSelector();
       if (menuDrawn == false){
         drawStaticMenu();
@@ -605,6 +605,7 @@ void loop() {
       break;
 
     case MENU2 :
+      wdt_reset();
       drawSelector();
       if (menuDrawn == false){
         drawStaticMenu();
@@ -628,6 +629,7 @@ void loop() {
       break;
 
     case M_PROGRAM :
+      wdt_reset();
       drawSelector();
       if (menuDrawn == false){
         drawStaticMenu();
@@ -661,7 +663,6 @@ void loop() {
             {
             beepConfirm();
             programStarted = true;
-            //day = 1;
             prg = selectedPogram; 
             DateTime now = rtc.now();
             dayCount = now.unixtime();
@@ -684,6 +685,7 @@ void loop() {
     break;
 
     case M_SPEED :
+      wdt_reset();
       drawSelector();
       static int setRpd;
       if (menuDrawn == false){
@@ -728,6 +730,7 @@ void loop() {
       break;
 
     case M_LIGHT_A :
+      wdt_reset();
       drawSelector();
       if (menuDrawn == false){
         drawStaticMenu();
@@ -761,6 +764,7 @@ void loop() {
       break;
 
     case M_LIGHT_B :
+      wdt_reset();
       drawSelector();
       if (menuDrawn == false){
         drawStaticMenu();
@@ -794,6 +798,7 @@ void loop() {
       break;
 
     case M_AUX_1 :
+      wdt_reset();
       drawSelector();
       if (menuDrawn == false){
         drawStaticMenu();
@@ -827,6 +832,7 @@ void loop() {
       break;
 
     case M_AUX_2 :
+      wdt_reset();
       drawSelector();
       if (menuDrawn == false){
         drawStaticMenu();
@@ -860,6 +866,7 @@ void loop() {
       break;
 
     case M_EEPROM :
+      wdt_reset();
       drawSelector();
       if (menuDrawn == false){
         drawStaticMenu();
