@@ -68,7 +68,7 @@ int day;                  //Days passed since beginning
 int tmp;                  //Current temperature
 int hum;                  //Current humidity  
 int lux;                  //Current luminosity
-int speed;                //Rotation speed
+int speed;              //Rotation speed
 
 int state = INFO_SCREEN;  //Screen state
 int selectorPosition = 0;
@@ -127,7 +127,8 @@ void setupTimer1() {
 }
 
 ISR(TIMER1_COMPA_vect){ //timer1 interrupt 1kHz keeps motor running at constant speed no matter what's going on
-  stepper.setSpeed(800);
+  speed = (rpd*3.666);
+  stepper.setSpeed(speed);
   stepper.runSpeed();
 }
 
@@ -542,7 +543,7 @@ void setup() {
   readFromEEPROM();
 
   welcomeScreen();     //Show welcome screen
-  beepStart();
+  //beepStart();
 }
 
 void loop() {
