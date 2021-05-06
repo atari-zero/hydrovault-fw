@@ -68,7 +68,7 @@ int day;                  //Days passed since beginning
 int tmp;                  //Current temperature
 int hum;                  //Current humidity  
 int lux;                  //Current luminosity
-int speed;              //Rotation speed
+int speed;                //Rotation speed
 
 int state = INFO_SCREEN;  //Screen state
 int selectorPosition = 0;
@@ -127,7 +127,7 @@ void setupTimer1() {
 }
 
 ISR(TIMER1_COMPA_vect){ //timer1 interrupt 1kHz keeps motor running at constant speed no matter what's going on
-  speed = (rpd*3.666);
+  speed = (rpd*2.371); //2.371 is speed index, calculated from gear ratio
   stepper.setSpeed(speed);
   stepper.runSpeed();
 }
@@ -136,7 +136,7 @@ void setupMotor(){  //TMC Stepper setup
   pinMode(CSPin, OUTPUT);
   digitalWrite(CSPin, HIGH);
   driver.begin();             // Initiate pins and registeries
-  driver.rms_current(600);    // Set stepper current to 600mA.
+  driver.rms_current(950);    // Set stepper current to 600mA.
   driver.stealthChop(1);      // Enable extremely quiet stepping
   driver.stealth_autoscale(1);
   driver.microsteps(16);
@@ -265,7 +265,7 @@ void drawStaticMenu(){
     lcd.setCursor(2,1);
     lcd.print("Status: ");
     lcd.setCursor(2,2);
-    lcd.print("Set Schedule:");
+    lcd.print("Set Schedule: ");
     lcd.setCursor(2,3);
     lcd.print("Exit");
   }
@@ -275,7 +275,7 @@ void drawStaticMenu(){
     lcd.setCursor(2,1);
     lcd.print("Status: ");
     lcd.setCursor(2,2);
-    lcd.print("Set Schedule:");
+    lcd.print("Set Schedule: ");
     lcd.setCursor(2,3);
     lcd.print("Exit");
   }
@@ -285,7 +285,7 @@ void drawStaticMenu(){
     lcd.setCursor(2,1);
     lcd.print("Status: ");
     lcd.setCursor(2,2);
-    lcd.print("Set Schedule:");
+    lcd.print("Mode: ");
     lcd.setCursor(2,3);
     lcd.print("Exit");
   }
@@ -295,7 +295,7 @@ void drawStaticMenu(){
     lcd.setCursor(2,1);
     lcd.print("Status: ");
     lcd.setCursor(2,2);
-    lcd.print("Set Schedule:");
+    lcd.print("Mode: ");
     lcd.setCursor(2,3);
     lcd.print("Exit");
   }
@@ -432,11 +432,11 @@ void beepStart(){
   buzzer.sound(NOTE_A6, 200); 
   buzzer.sound(NOTE_D4, 300);
   buzzer.sound(NOTE_F4, 400);
+  buzzer.sound(0, 200);
+  buzzer.sound(NOTE_F7, 300);
   buzzer.sound(NOTE_D6, 80); 
   buzzer.sound(NOTE_E6, 80);  
   buzzer.sound(NOTE_F6, 80); 
-  buzzer.sound(0, 200);
-  buzzer.sound(NOTE_F7, 300);
   buzzer.end(200);
 }
 
@@ -470,9 +470,17 @@ void readFromEEPROM(){
   programStarted = HVData.storedProgStarted;
   relayAStat = HVData.storedRelayA;
   relayBStat = HVData.storedRelayB;
-  auxAStat = HVData.storedRelayA;
-  auxBStat = HVData.storedRelayB;
+  auxAStat = HVData.storedAuxA;
+  auxBStat = HVData.storedAuxB;
   dayCount = HVData.storedDayCount;
+}
+
+void pump(){
+  int WaterLevel;
+  WaterLevel = analogRead(potApin);
+  if (WaterLevel >= 900) auxBStat = false;   
+  else if (WaterLevel < 900) auxBStat = true;
+  //Serial.println(analogRead(potApin));
 }
 
 void runProgram(){
@@ -531,7 +539,7 @@ void setup() {
   pinMode(A1, OUTPUT); // light relay B
   pinMode(A2, OUTPUT); //AM2320 Power
   pinMode(A3, INPUT_PULLUP);  // encoder button
-  pinMode(A6, INPUT);  // potentiometer 1
+  pinMode(A6, INPUT);  // water sensor
   pinMode(A7, INPUT);  // potentiometer 2
   pinMode(2, INPUT);   // encoder interrupt A
   pinMode(3, INPUT);   // encoder interrrupt B
@@ -543,7 +551,7 @@ void setup() {
   readFromEEPROM();
 
   welcomeScreen();     //Show welcome screen
-  //beepStart();
+  beepStart();
 }
 
 void loop() {
@@ -554,6 +562,7 @@ void loop() {
   readEncoder();
   buttonPress();
   runProgram();
+  pump();
 
   switch (state){
     case INFO_SCREEN :
@@ -679,6 +688,7 @@ void loop() {
             lcd.clear();
             state = MENU1;
             selectorPosition = 1;
+            writeToEEPROM();
             break; 
             }       
         }
@@ -725,6 +735,7 @@ void loop() {
             lcd.clear();
             state = MENU1;
             selectorPosition = 1;
+            writeToEEPROM();
             break;       
         }
       }    
@@ -759,6 +770,7 @@ void loop() {
               lcd.clear();
               state = MENU1;
               selectorPosition = 2;
+              writeToEEPROM();
               break;
           }
         }  
@@ -793,6 +805,7 @@ void loop() {
               lcd.clear();
               state = MENU1;
               selectorPosition = 3;
+              writeToEEPROM();
               break;
           }
         }  
@@ -827,6 +840,7 @@ void loop() {
               lcd.clear();
               state = MENU2;
               selectorPosition = 0;
+              writeToEEPROM();
               break;
           }
         }  
@@ -861,6 +875,7 @@ void loop() {
               lcd.clear();
               state = MENU2;
               selectorPosition = 1;
+              writeToEEPROM();
               break;
           }
         }  
